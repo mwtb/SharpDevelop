@@ -267,7 +267,7 @@ namespace ICSharpCode.AvalonEdit.Folding
 			public FoldingManagerInstallation(TextArea textArea) : base(textArea.TextView, textArea.Document)
 			{
 				this.textArea = textArea;
-				margin = new FoldingMargin() { FoldingManager = this };
+				margin = new FoldingMargin( new FoldingMarginMarkerFactory() ) { FoldingManager = this };
 				generator = new FoldingElementGenerator() { FoldingManager = this };
 				textArea.LeftMargins.Add(margin);
 				// HACK: folding only works correctly when it has highest priority

@@ -25,12 +25,61 @@ namespace ICSharpCode.AvalonEdit.Folding
 		/// </summary>
 		public FoldingManager FoldingManager { get; set; }
 		
+		
+		Pen grayPen;
+		Pen blackPen;
+		
+		private Brush _foreground = Brushes.Gray;
+		public Brush Foreground
+		{
+			get{ return _foreground; } 
+			set{ _foreground = value; grayPen = null;}
+		}
+		private Brush _foregroundHighlighted = Brushes.Black;
+		public Brush ForegroundHighlighted{
+			get{ return _foregroundHighlighted; } 
+			set{ _foregroundHighlighted = value; blackPen = null;}
+		}
+		private Brush _background = Brushes.White;
+		public Brush Background
+		{
+			get{ return _background; } 
+			set{ _background = value;}
+		}
+		private Brush _backgroundHighlighted = Brushes.White;
+		public Brush BackgroundHighlighted
+		{
+			get{ return _backgroundHighlighted; } 
+			set{ _backgroundHighlighted = value;}
+		}
+		private Brush _border = Brushes.Gray;
+		public Brush Border
+		{
+			get{ return _border; } 
+			set{ _border = value; }
+		}
+		private Brush _borderHighlighted = Brushes.Black;
+		public Brush BorderHighlighted
+		{
+			get{ return _borderHighlighted; } 
+			set{ _borderHighlighted = value; }
+		}
+		
 		internal const double SizeFactor = Constants.PixelPerPoint;
+		
+		IFoldingMarginMarkerFactory _markerFactory;
+		public FoldingMargin( IFoldingMarginMarkerFactory markerFactory)
+		{
+			if( markerFactory == null )
+				throw new ArgumentNullException("markerFactory","may not be null");
+			
+			_markerFactory = markerFactory;
+		}
 		
 		/// <inheritdoc/>
 		protected override Size MeasureOverride(Size availableSize)
 		{
-			foreach (FoldingMarginMarker m in markers) {
+			foreach (BaseFoldingMarginMarker m in markers) {
 				m.Measure(availableSize);
 			}
 			double width = SizeFactor * (double)GetValue(TextBlock.FontSizeProperty);
@@ -41,7 +90,7 @@ namespace ICSharpCode.AvalonEdit.Folding
 		protected override Size ArrangeOverride(Size finalSize)
 		{
 			Size pixelSize = PixelSnapHelpers.GetPixelSize(this);
-			foreach (FoldingMarginMarker m in markers) {
+			foreach (BaseFoldingMarginMarker m in markers) {
 				int visualColumn = m.VisualLine.GetVisualColumn(m.FoldingSection.StartOffset - m.VisualLine.FirstDocumentLine.Offset);
 				TextLine textLine = m.VisualLine.GetTextLine(visualColumn);
 				double yPos = m.VisualLine.GetTextLineVisualYPosition(textLine, VisualYPosition.LineTop) - TextView.VerticalOffset;
@@ -65,11 +114,11 @@ namespace ICSharpCode.AvalonEdit.Folding
 			TextViewVisualLinesChanged(null, null);
 		}
 		
-		List<FoldingMarginMarker> markers = new List<FoldingMarginMarker>();
+		List<BaseFoldingMarginMarker> markers = new List<BaseFoldingMarginMarker>();
 		
 		void TextViewVisualLinesChanged(object sender, EventArgs e)
 		{
-			foreach (FoldingMarginMarker m in markers) {
+			foreach (BaseFoldingMarginMarker m in markers) {
 				RemoveVisualChild(m);
 			}
 			markers.Clear();
@@ -80,11 +129,7 @@ namespace ICSharpCode.AvalonEdit.Folding
 					if (fs == null)
 						continue;
 					if (fs.StartOffset <= line.LastDocumentLine.Offset + line.LastDocumentLine.Length) {
-						FoldingMarginMarker m = new FoldingMarginMarker {
-							IsExpanded = !fs.IsFolded,
-							VisualLine = line,
-							FoldingSection = fs
-						};
+						BaseFoldingMarginMarker m = _markerFactory.CreateFoldingMarginMarker(this,fs,line);
 						markers.Add(m);
 						AddVisualChild(m);
 						
@@ -108,8 +153,24 @@ namespace ICSharpCode.AvalonEdit.Folding
 			return markers[index];
 		}
 		
-		static readonly Pen grayPen = MakeFrozenPen(Brushes.Gray);
-		static readonly Pen blackPen = MakeFrozenPen(Brushes.Black);
+		Pen getRenderPen()
+		{
+			if( grayPen == null )
+			{
+				grayPen = MakeFrozenPen(Foreground);
+			}
+			return grayPen;
+			
+		}
+		
+		Pen getHighlightedPen()
+		{
+			if( blackPen == null )
+			{
+				blackPen = MakeFrozenPen(ForegroundHighlighted);
+			}
+			return blackPen;
+		}
 		
 		static Pen MakeFrozenPen(Brush brush)
 		{
@@ -178,7 +239,7 @@ namespace ICSharpCode.AvalonEdit.Folding
 		/// </summary>
 		void CalculateFoldLinesForMarkers(List<TextLine> allTextLines, Pen[] colors, Pen[] endMarker)
 		{
-			foreach (FoldingMarginMarker marker in markers) {
+			foreach (BaseFoldingMarginMarker marker in markers) {
 				int end = marker.FoldingSection.EndOffset;
 				int endTextLineNr = GetTextLineIndexFromOffset(allTextLines, end);
 				if (!marker.FoldingSection.IsFolded && endTextLineNr >= 0) {

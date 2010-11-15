@@ -17,10 +17,22 @@ namespace ICSharpCode.AvalonEdit.Folding
 	/// </summary>
 	public class FoldingElementGenerator : VisualLineElementGenerator
 	{
+		
+		public Brush Foreground{get; set;}
+		public Brush Background{get; set;}
+		public Brush Border{get; set;}
+				
 		/// <summary>
 		/// Gets/Sets the folding manager from which the foldings should be shown.
 		/// </summary>
 		public FoldingManager FoldingManager { get; set; }
+		
+		public FoldingElementGenerator()
+		{
+			Foreground = Brushes.Gray;
+			Background = Brushes.Transparent;
+			Border = Brushes.Gray;
+		}
 		
 		/// <inheritdoc/>
 		public override void StartGeneration(ITextRunConstructionContext context)
@@ -59,31 +71,39 @@ namespace ICSharpCode.AvalonEdit.Folding
 				}
 			}
 			if (foldedUntil > offset && foldingSection != null) {
-				string title = foldingSection.Title;
-				if (string.IsNullOrEmpty(title))
-					title = "...";
-				var p = new VisualLineElementTextRunProperties(CurrentContext.GlobalTextRunProperties);
-				p.SetForegroundBrush(Brushes.Gray);
-				var textFormatter = TextFormatterFactory.Create(CurrentContext.TextView);
-				var text = FormattedTextElement.PrepareText(textFormatter, title, p);
-				return new FoldingLineElement(foldingSection, text, foldedUntil - offset);
+				return getFoldedElement(foldingSection,foldedUntil - offset);
 			} else {
 				return null;
 			}
 		}
 		
+		protected virtual VisualLineElement getFoldedElement( FoldingSection foldingSection, int sectionLength )
+		{
+			string title = foldingSection.Title;
+				if (string.IsNullOrEmpty(title))
+					title = "...";
+				var p = new VisualLineElementTextRunProperties(CurrentContext.GlobalTextRunProperties);
+				p.SetForegroundBrush(Foreground);
+				p.SetBackgroundBrush(Background);
+				var textFormatter = TextFormatterFactory.Create(CurrentContext.TextView);
+				var text = FormattedTextElement.PrepareText(textFormatter, title, p);
+				return new FoldingLineElement(foldingSection, text, sectionLength, new Pen(Border,1.0));
+		}
+		
 		sealed class FoldingLineElement : FormattedTextElement
 		{
 			readonly FoldingSection fs;
+			readonly Pen _outlinePen;
 			
-			public FoldingLineElement(FoldingSection fs, TextLine text, int documentLength) : base(text, documentLength)
+			public FoldingLineElement(FoldingSection fs, TextLine text, int documentLength, Pen outlinePen) : base(text, documentLength)
 			{
 				this.fs = fs;
+				_outlinePen = outlinePen;
 			}
 			
 			public override TextRun CreateTextRun(int startVisualColumn, ITextRunConstructionContext context)
 			{
-				return new FoldingLineTextRun(this, this.TextRunProperties);
+				return new FoldingLineTextRun(this, this.TextRunProperties, _outlinePen);
 			}
 			
 			protected internal override void OnMouseDown(MouseButtonEventArgs e)
@@ -99,16 +119,27 @@ namespace ICSharpCode.AvalonEdit.Folding
 		
 		sealed class FoldingLineTextRun : FormattedTextRun
 		{
+			private Pen _outlinePen = new Pen(Brushes.Gray, 1);
+			
 			public FoldingLineTextRun(FormattedTextElement element, TextRunProperties properties)
 				: base(element, properties)
 			{
+			}
+			
+			public FoldingLineTextRun(FormattedTextElement element, TextRunProperties properties, Pen outlinePen)
+				: this(element, properties)
+			{
+				if( outlinePen == null )
+					throw new ArgumentNullException("outlinePen", "Pen cannot be null.");
+				else
+					_outlinePen = outlinePen;
 			}
 			
 			public override void Draw(DrawingContext drawingContext, Point origin, bool rightToLeft, bool sideways)
 			{
 				var metrics = Format(double.PositiveInfinity);
 				Rect r = new Rect(origin.X, origin.Y - metrics.Baseline, metrics.Width, metrics.Height);
-				drawingContext.DrawRectangle(null, new Pen(Brushes.Gray, 1), r);
+				drawingContext.DrawRectangle(null, _outlinePen, r);
 				base.Draw(drawingContext, origin, rightToLeft, sideways);
 			}
 		}

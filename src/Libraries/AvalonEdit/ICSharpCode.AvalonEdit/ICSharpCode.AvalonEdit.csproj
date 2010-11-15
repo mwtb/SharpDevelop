@@ -177,6 +177,7 @@
     <Compile Include="Editing\TextSegmentReadOnlySectionProvider.cs">
       <DependentUpon>IReadOnlySectionProvider.cs</DependentUpon>
     </Compile>
+    <Compile Include="Folding\IFoldingMarginMarkerFactory.cs" />
     <Compile Include="Folding\NewFolding.cs" />
     <Compile Include="Folding\XmlFoldingStrategy.cs" />
     <Compile Include="Highlighting\DocumentHighlighter.cs" />
