@@ -83,7 +83,12 @@ namespace ICSharpCode.SharpDevelop.Project.Commands
 		public override void Run()
 		{
 			LoggingService.Info("Debugger Command: StepOver");
-			DebuggerService.CurrentDebugger.StepOver();
+			if (!DebuggerService.CurrentDebugger.IsDebugging) {
+				DebuggerService.CurrentDebugger.BreakAtBeginning = true;
+				new Execute().Run();
+			} else { 
+				DebuggerService.CurrentDebugger.StepOver();
+			}
 		}
 	}
 	
@@ -92,7 +97,12 @@ namespace ICSharpCode.SharpDevelop.Project.Commands
 		public override void Run()
 		{
 			LoggingService.Info("Debugger Command: StepInto");
-			DebuggerService.CurrentDebugger.StepInto();
+			if (!DebuggerService.CurrentDebugger.IsDebugging) {
+				DebuggerService.CurrentDebugger.BreakAtBeginning = true;
+				new Execute().Run();
+			} else { 
+				DebuggerService.CurrentDebugger.StepInto();
+			}
 		}
 	}
 	
@@ -124,16 +134,7 @@ namespace ICSharpCode.SharpDevelop.Project.Commands
 	{
 		public override void Run()
 		{
-			if (DebuggerService.Breakpoints.Count <= 0) return;
-			
-			if(System.Windows.Forms.MessageBox.Show(
-				StringParser.Parse("${res:ICSharpCode.SharpDevelop.Commands.Debug.RemoveAllBreakPoints}"),
-				StringParser.Parse("${res:ICSharpCode.SharpDevelop.Commands.Debug.RemoveAllBreakPointsCaption}"),
-				System.Windows.Forms.MessageBoxButtons.YesNo, 
-				System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
-			{
-				BookmarkManager.RemoveAll(b => b is BreakpointBookmark);
-			}
+			BookmarkManager.RemoveAll(b => b is BreakpointBookmark);
 		}
 	}
 	
@@ -141,8 +142,12 @@ namespace ICSharpCode.SharpDevelop.Project.Commands
 	{
 		public override void Run()
 		{
-			var bookmarkBase = (BookmarkPadBase)Owner;			
+			if (Owner == null || !(Owner is BookmarkPadBase)) return;
+			
+			var bookmarkBase = (BookmarkPadBase)Owner;
 			var item = bookmarkBase.CurrentItem;
+			
+			if (item == null) return;
 			
 			if (item.Mark is BreakpointBookmark) {
 				BookmarkManager.RemoveMark(item.Mark);

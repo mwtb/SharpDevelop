@@ -37,6 +37,9 @@ namespace ICSharpCode.SharpDevelop.Project
 		#region Enumerate projects/folders
 		public IProject FindProjectContainingFile(string fileName)
 		{
+			if (fileName == null)
+				throw new ArgumentNullException("fileName");
+			
 			IProject currentProject = ProjectService.CurrentProject;
 			if (currentProject != null && currentProject.IsFileInProject(fileName))
 				return currentProject;
@@ -452,8 +455,6 @@ namespace ICSharpCode.SharpDevelop.Project
 		{
 			ProjectSection nestedProjectsSection = null;
 			
-			bool needsConversion = false;
-			
 			// read solution files using system encoding, but detect UTF8 if BOM is present
 			using (StreamReader sr = new StreamReader(newSolution.FileName, Encoding.Default, true)) {
 				string line = GetFirstNonCommentLine(sr);
@@ -465,17 +466,9 @@ namespace ICSharpCode.SharpDevelop.Project
 				
 				switch (match.Result("${Version}")) {
 					case "7.00":
-						needsConversion = true;
-						if (!MessageService.AskQuestion("${res:SharpDevelop.Solution.ConvertSolutionVersion7}")) {
-							return false;
-						}
-						break;
 					case "8.00":
-						needsConversion = true;
-						if (!MessageService.AskQuestion("${res:SharpDevelop.Solution.ConvertSolutionVersion8}")) {
-							return false;
-						}
-						break;
+						MessageService.ShowError("${res:SharpDevelop.Solution.CannotLoadOldSolution}");
+						return false;
 					case "9.00":
 					case "10.00":
 					case "11.00":
@@ -503,7 +496,7 @@ namespace ICSharpCode.SharpDevelop.Project
 				}
 			}
 			
-			if (!newSolution.ReadOnly && (newSolution.FixSolutionConfiguration(newSolution.Projects) || needsConversion)) {
+			if (!newSolution.ReadOnly && (newSolution.FixSolutionConfiguration(newSolution.Projects))) {
 				// save in new format
 				newSolution.Save();
 			}

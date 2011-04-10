@@ -75,6 +75,77 @@ namespace ICSharpCode.AvalonEdit.Folding
 			
 			_markerFactory = markerFactory;
 		}
+		#region Brushes
+		/// <summary>
+		/// FoldingMarkerBrush dependency property.
+		/// </summary>
+		public static readonly DependencyProperty FoldingMarkerBrushProperty =
+			DependencyProperty.RegisterAttached("FoldingMarkerBrush", typeof(Brush), typeof(FoldingMargin),
+			                                    new FrameworkPropertyMetadata(Brushes.Gray, FrameworkPropertyMetadataOptions.Inherits, OnUpdateBrushes));
+		
+		/// <summary>
+		/// Gets/sets the Brush used for displaying the lines of folding markers.
+		/// </summary>
+		public Brush FoldingMarkerBrush {
+			get { return (Brush)GetValue(FoldingMarkerBrushProperty); }
+			set { SetValue(FoldingMarkerBrushProperty, value); }
+		}
+		
+		/// <summary>
+		/// FoldingMarkerBackgroundBrush dependency property.
+		/// </summary>
+		public static readonly DependencyProperty FoldingMarkerBackgroundBrushProperty =
+			DependencyProperty.RegisterAttached("FoldingMarkerBackgroundBrush", typeof(Brush), typeof(FoldingMargin),
+			                                    new FrameworkPropertyMetadata(Brushes.White, FrameworkPropertyMetadataOptions.Inherits, OnUpdateBrushes));
+		
+		/// <summary>
+		/// Gets/sets the Brush used for displaying the background of folding markers.
+		/// </summary>
+		public Brush FoldingMarkerBackgroundBrush {
+			get { return (Brush)GetValue(FoldingMarkerBackgroundBrushProperty); }
+			set { SetValue(FoldingMarkerBackgroundBrushProperty, value); }
+		}
+		
+		/// <summary>
+		/// SelectedFoldingMarkerBrush dependency property.
+		/// </summary>
+		public static readonly DependencyProperty SelectedFoldingMarkerBrushProperty =
+			DependencyProperty.RegisterAttached("SelectedFoldingMarkerBrush",
+			                                    typeof(Brush), typeof(FoldingMargin),
+			                                    new FrameworkPropertyMetadata(Brushes.Black, FrameworkPropertyMetadataOptions.Inherits, OnUpdateBrushes));
+		
+		/// <summary>
+		/// Gets/sets the Brush used for displaying the lines of selected folding markers.
+		/// </summary>
+		public Brush SelectedFoldingMarkerBrush {
+			get { return (Brush)GetValue(SelectedFoldingMarkerBrushProperty); }
+			set { SetValue(SelectedFoldingMarkerBrushProperty, value); }
+		}
+		
+		/// <summary>
+		/// SelectedFoldingMarkerBackgroundBrush dependency property.
+		/// </summary>
+		public static readonly DependencyProperty SelectedFoldingMarkerBackgroundBrushProperty =
+			DependencyProperty.RegisterAttached("SelectedFoldingMarkerBackgroundBrush",
+			                                    typeof(Brush), typeof(FoldingMargin),
+			                                    new FrameworkPropertyMetadata(Brushes.White, FrameworkPropertyMetadataOptions.Inherits, OnUpdateBrushes));
+		
+		/// <summary>
+		/// Gets/sets the Brush used for displaying the background of selected folding markers.
+		/// </summary>
+		public Brush SelectedFoldingMarkerBackgroundBrush {
+			get { return (Brush)GetValue(SelectedFoldingMarkerBackgroundBrushProperty); }
+			set { SetValue(SelectedFoldingMarkerBackgroundBrushProperty, value); }
+		}
+		
+		static void OnUpdateBrushes(DependencyObject d, DependencyPropertyChangedEventArgs e)
+		{
+			if (e.Property.Name == FoldingMarkerBrushProperty.Name)
+				foldingControlPen = MakeFrozenPen((Brush)e.NewValue);
+			if (e.Property.Name == SelectedFoldingMarkerBrushProperty.Name)
+				selectedFoldingControlPen = MakeFrozenPen((Brush)e.NewValue);
+		}
+		#endregion
 		
 		/// <inheritdoc/>
 		protected override Size MeasureOverride(Size availableSize)
@@ -130,6 +201,7 @@ namespace ICSharpCode.AvalonEdit.Folding
 						continue;
 					if (fs.StartOffset <= line.LastDocumentLine.Offset + line.LastDocumentLine.Length) {
 						BaseFoldingMarginMarker m = _markerFactory.CreateFoldingMarginMarker(this,fs,line);
+						
 						markers.Add(m);
 						AddVisualChild(m);
 						
@@ -171,6 +243,8 @@ namespace ICSharpCode.AvalonEdit.Folding
 			}
 			return blackPen;
 		}
+		static Pen foldingControlPen = MakeFrozenPen((Brush)FoldingMarkerBrushProperty.DefaultMetadata.DefaultValue);
+		static Pen selectedFoldingControlPen = MakeFrozenPen((Brush)SelectedFoldingMarkerBrushProperty.DefaultMetadata.DefaultValue);
 		
 		static Pen MakeFrozenPen(Brush brush)
 		{
@@ -213,7 +287,7 @@ namespace ICSharpCode.AvalonEdit.Folding
 				if (end < viewEndOffset && !fs.IsFolded) {
 					int textLineNr = GetTextLineIndexFromOffset(allTextLines, end);
 					if (textLineNr >= 0) {
-						endMarker[textLineNr] = grayPen;
+						endMarker[textLineNr] = foldingControlPen;
 					}
 				}
 				if (end > maxEndOffset && fs.StartOffset < viewStartOffset) {
@@ -223,12 +297,12 @@ namespace ICSharpCode.AvalonEdit.Folding
 			if (maxEndOffset > 0) {
 				if (maxEndOffset > viewEndOffset) {
 					for (int i = 0; i < colors.Length; i++) {
-						colors[i] = grayPen;
+						colors[i] = foldingControlPen;
 					}
 				} else {
 					int maxTextLine = GetTextLineIndexFromOffset(allTextLines, maxEndOffset);
 					for (int i = 0; i <= maxTextLine; i++) {
-						colors[i] = grayPen;
+						colors[i] = foldingControlPen;
 					}
 				}
 			}
@@ -244,17 +318,17 @@ namespace ICSharpCode.AvalonEdit.Folding
 				int endTextLineNr = GetTextLineIndexFromOffset(allTextLines, end);
 				if (!marker.FoldingSection.IsFolded && endTextLineNr >= 0) {
 					if (marker.IsMouseDirectlyOver)
-						endMarker[endTextLineNr] = blackPen;
+						endMarker[endTextLineNr] = selectedFoldingControlPen;
 					else if (endMarker[endTextLineNr] == null)
-						endMarker[endTextLineNr] = grayPen;
+						endMarker[endTextLineNr] = foldingControlPen;
 				}
 				int startTextLineNr = GetTextLineIndexFromOffset(allTextLines, marker.FoldingSection.StartOffset);
 				if (startTextLineNr >= 0) {
 					for (int i = startTextLineNr + 1; i < colors.Length && i - 1 != endTextLineNr; i++) {
 						if (marker.IsMouseDirectlyOver)
-							colors[i] = blackPen;
+							colors[i] = selectedFoldingControlPen;
 						else if (colors[i] == null)
-							colors[i] = grayPen;
+							colors[i] = foldingControlPen;
 					}
 				}
 			}

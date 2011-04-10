@@ -2,12 +2,14 @@
 <UserControl
 	x:Class="Debugger.AddIn.Pads.Controls.WatchList" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:localControls="clr-namespace:Debugger.AddIn.Pads.Controls" xmlns:core="http://icsharpcode.net/sharpdevelop/core"
 	DataContext="{Binding RelativeSource={RelativeSource Self}}"
+	x:Name="ControlList"
 	Background="White">
 	<UserControl.Resources>
 		<localControls:BoolToVisibilityConverter
-			x:Key="boolToVisibility" />
+			x:Key="boolToVisibility" />		
 		<localControls:TreeListViewConverter
 			x:Key="TreeListViewConverter" />
+		
 		<Style
 			x:Key="BorderStyle"
 			TargetType="Border">
@@ -26,13 +28,11 @@
 		</Style>
 		<Style
 			TargetType="{x:Type TextBox}"
-			x:Key="TextBoxStyle">
+			x:Key="TextBoxValueStyle">
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="Background" Value="White"/>
-			<Setter
-				Property="VerticalAlignment"
-				Value="Center" />
+			<Setter Property="VerticalAlignment" Value="Center" />
 			<Setter
 				Property="Visibility">
 				<Setter.Value>
@@ -50,7 +50,7 @@
 		</Style>
 		<Style
 			TargetType="{x:Type TextBlock}"
-			x:Key="TextBlockStyle">
+			x:Key="TextBlockValueStyle">
 			<Setter
 				Property="VerticalAlignment"
 				Value="Center" />
@@ -256,7 +256,12 @@
 					MinWidth="400"
 					HorizontalAlignment="Stretch"
 					VerticalAlignment="Center"
-					Text="{Binding Path=Name}" />
+					Text="{Binding Path=Name}"
+					Visibility="Visible"/>
+				<localControls:WatchListAutoCompleteCell
+					CommandText="{Binding Path=Name, Mode=OneWay}"
+					Visibility="Collapsed"
+					CommandEntered="WatchListAutoCompleteCell_CommandEntered"/>
 			</StackPanel>
 			<DataTemplate.Triggers>
 				<DataTrigger
@@ -278,10 +283,10 @@
 					VerticalAlignment="Center"
 					MinWidth="200"
 					Text="{Binding Path=Text}"
-					Style="{StaticResource TextBlockStyle}" />
+					Style="{StaticResource TextBlockValueStyle}" />
 				<TextBox
 					Text="{Binding Path=Text, Mode=OneWay}"
-					Style="{StaticResource TextBoxStyle}" KeyUp="TextBox_KeyUp" />
+					Style="{StaticResource TextBoxValueStyle}" KeyUp="OnValueTextBoxKeyUp" />
 			</StackPanel>
 		</DataTemplate>
 		<!-- Type column -->
@@ -295,13 +300,14 @@
 	</UserControl.Resources>
 	<DockPanel>
 		<localControls:TreeListView
+			PreviewMouseDoubleClick="MyList_PreviewMouseDoubleClick"
+			TreeViewItem.Expanded="MyList_Expanded"
 			HorizontalAlignment="Stretch"
 			VerticalAlignment="Stretch"
 			ItemsSource="{Binding Path=WatchItems}"
 			x:Name="MyList">
 			<localControls:TreeListView.ItemTemplate>
-				<HierarchicalDataTemplate
-					ItemsSource="{Binding ChildNodes}"/>
+				<HierarchicalDataTemplate />
 			</localControls:TreeListView.ItemTemplate>
 			<localControls:TreeListView.Resources>
 				<Style x:Key="ColumnHeaderStyle" TargetType="{x:Type GridViewColumnHeader}">

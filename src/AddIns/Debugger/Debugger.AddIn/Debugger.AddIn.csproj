@@ -58,6 +58,15 @@
     <StartProgram>..\..\..\..\bin\SharpDevelop.exe</StartProgram>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="GraphSharp">
+      <HintPath>..\..\..\Libraries\GraphSharp\GraphSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="GraphSharp.Controls">
+      <HintPath>..\..\..\Libraries\GraphSharp\GraphSharp.Controls.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="PresentationCore">
       <RequiredTargetFramework>3.0</RequiredTargetFramework>
     </Reference>
@@ -67,19 +76,21 @@
     <Reference Include="PresentationFramework.Aero">
       <RequiredTargetFramework>3.0</RequiredTargetFramework>
     </Reference>
+    <Reference Include="QuickGraph">
+      <HintPath>..\..\..\Libraries\GraphSharp\QuickGraph.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
     </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase">
-      <RequiredTargetFramework>3.0</RequiredTargetFramework>
-    </Reference>
-    <Reference Include="WindowsFormsIntegration">
       <RequiredTargetFramework>3.0</RequiredTargetFramework>
     </Reference>
     <Reference Include="WindowsFormsIntegration, Version=4.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
@@ -91,13 +102,36 @@
       <DependentUpon>CallStackPad.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Pads\Commands\MemoryPadCommands.cs" />
+    <Compile Include="Pads\Commands\ParallelStacksViewCommands.cs" />
+    <Compile Include="Pads\Commands\SelectLanguageCommand.cs" />
+    <Compile Include="Pads\Commands\WatchPadCommands.cs" />
     <Compile Include="Pads\Controls\ConditionCell.xaml.cs">
       <DependentUpon>ConditionCell.xaml</DependentUpon>
     </Compile>
     <Compile Include="Pads\Controls\Converters.cs" />
+    <Compile Include="Pads\Controls\SimpleListViewControl.xaml.cs">
+      <DependentUpon>SimpleListViewControl.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Pads\Controls\TreeListView.cs" />
     <Compile Include="Pads\Controls\WatchList.xaml.cs">
       <DependentUpon>WatchList.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Pads\Controls\WatchListAutoCompleteCell.cs">
+      <DependentUpon>WatchListAutoCompleteCell.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Pads\MemoryPad.cs" />
+    <Compile Include="Pads\ParallelPad\DrawSurface.xaml.cs">
+      <DependentUpon>DrawSurface.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Pads\ParallelPad\ParallelStackPad.cs" />
+    <Compile Include="Pads\ParallelPad\ParallelStacksGraph.cs" />
+    <Compile Include="Pads\ParallelPad\SelectedFrameBookmark.cs" />
+    <Compile Include="Pads\ParallelPad\ThreadStack.xaml.cs">
+      <DependentUpon>ThreadStack.xaml</DependentUpon>
+      <SubType>Code</SubType>
     </Compile>
     <Compile Include="Pads\WatchInputBox.xaml.cs">
       <DependentUpon>WatchInputBox.xaml</DependentUpon>
@@ -123,8 +157,6 @@
       <DependentUpon>DebuggingSymbolsPanel.cs</DependentUpon>
     </Compile>
     <Compile Include="Pads\ObjectGraphPad.cs" />
-    <Compile Include="Pads\SelectLanguageCommand.cs" />
-    <Compile Include="Pads\WatchPadCommands.cs" />
     <Compile Include="Pads\BreakPointsPad.cs" />
     <Compile Include="Pads\ConsolePad.cs">
       <SubType>UserControl</SubType>
@@ -155,7 +187,27 @@
       <DependentUpon>EditBreakpointScriptWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="Service\ProcessMonitor.cs" />
+    <Compile Include="Tooltips\DebuggerPopup.cs" />
+    <Compile Include="Tooltips\DebuggerTooltipControl.xaml.cs">
+      <DependentUpon>DebuggerTooltipControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Tooltips\LazyItemsControl.cs" />
+    <Compile Include="Tooltips\PinCloseControl.xaml.cs">
+      <DependentUpon>PinCloseControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Tooltips\PinDebuggerControl.xaml.cs">
+      <DependentUpon>PinDebuggerControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Tooltips\PinLayer.cs" />
+    <Compile Include="Tooltips\PinningBinding.cs" />
+    <Compile Include="Tooltips\VirtualizingIEnumerable.cs" />
+    <Compile Include="Tooltips\VisualizerPicker.cs">
+      <DependentUpon>VisualizerPicker.xaml</DependentUpon>
+    </Compile>
     <Compile Include="TreeModel\DebuggerResourceService.cs" />
+    <Compile Include="TreeModel\SavedTreeNode.cs" />
+    <Compile Include="TreeModel\TreeNode.cs" />
     <Compile Include="Visualizers\Commands\ExpressionVisualizerCommand.cs" />
     <Compile Include="Visualizers\Commands\GridVisualizerCommand.cs" />
     <Compile Include="Visualizers\Commands\IVisualizerDescriptor.cs" />
@@ -247,7 +299,6 @@
     </Compile>
     <Compile Include="Pads\DebuggerPad.cs" />
     <Compile Include="Pads\RunningThreadsPad.Menu.cs" />
-    <Compile Include="TreeModel\TreeNode.cs" />
     <Compile Include="TreeModel\Adapters\TreeViewVarNode.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -345,9 +396,18 @@
   <ItemGroup>
     <Page Include="Pads\CallStackPad.xaml" />
     <Page Include="Pads\Controls\ConditionCell.xaml" />
+    <Page Include="Pads\Controls\SimpleListViewControl.xaml" />
     <Page Include="Pads\Controls\WatchList.xaml" />
+    <Page Include="Pads\Controls\WatchListAutoCompleteCell.xaml" />
+    <Page Include="Pads\ParallelPad\DrawSurface.xaml" />
+    <Page Include="Pads\ParallelPad\ThreadStack.xaml" />
     <Page Include="Pads\WatchInputBox.xaml" />
     <Page Include="Service\EditBreakpointScriptWindow.xaml" />
+    <Page Include="Tooltips\DebuggerTooltipControl.xaml" />
+    <Page Include="Tooltips\PinCloseControl.xaml" />
+    <Page Include="Tooltips\PinControlsDictionary.xaml" />
+    <Page Include="Tooltips\PinDebuggerControl.xaml" />
+    <Page Include="Tooltips\VisualizerPicker.xaml" />
     <Page Include="Visualizers\Graph\Drawing\NodeControlResources.xaml" />
     <Page Include="Visualizers\Graph\Drawing\PositionedGraphNodeControl.xaml" />
     <Page Include="Visualizers\Graph\ObjectGraphControl.xaml" />
@@ -368,7 +428,10 @@
       <Name>ICSharpCode.Core.WinForms</Name>
       <Private>False</Private>
     </ProjectReference>
+    <Folder Include="Pads\Commands" />
     <Folder Include="Pads\Controls" />
+    <Folder Include="Pads\ParallelPad" />
+    <Folder Include="Tooltips" />
     <Folder Include="Visualizers\Graph" />
     <Folder Include="Visualizers\Graph\Drawing" />
     <Folder Include="Visualizers\Graph\Layout" />

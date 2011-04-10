@@ -89,8 +89,8 @@
     <Compile Include="Project\BaseClasses\SinglePage.cs" />
     <Compile Include="Project\BaseClasses\SectionBounds.cs" />
     <Compile Include="Project\BaseClasses\SortColumn.cs" />
-    <Compile Include="Project\BaseItems\BaseGroupedRow.cs" />
-    <Compile Include="Project\BaseItems\BaseGroupItem.cs" />
+    <Compile Include="Project\BaseItems\GroupHeader.cs" />
+    <Compile Include="Project\BaseItems\GroupFooter.cs" />
     <Compile Include="Project\BaseItems\BaseTextItem.cs" />
     <Compile Include="Project\BaseItems\BaseGraphicItem.cs" />
     <Compile Include="Project\BaseItems\BaseReportItem.cs" />
@@ -124,10 +124,8 @@
     </Compile>
     <Compile Include="Project\Dialogs\DefaultTextEditor.cs" />
     <Compile Include="Project\Dialogs\SortingCollectionEditor.cs" />
-    <Compile Include="Project\Events\GroupChangedEventArgs.cs" />
     <Compile Include="Project\Events\NewPageEventArgs.cs" />
     <Compile Include="Project\Events\ReportPageEventArgs.cs" />
-    <Compile Include="Project\Events\ReportParametersEventArgs.cs" />
     <Compile Include="Project\Exceptions\FieldNotFoundException.cs" />
     <Compile Include="Project\Exceptions\GroupLevelException.cs" />
     <Compile Include="Project\Exceptions\IllegalFileFormat.cs" />
@@ -254,7 +252,6 @@
     <Compile Include="Project\Globals\UnitConverter.cs" />
     <Compile Include="Project\Interfaces\IDataAccessStrategy.cs" />
     <Compile Include="Project\Interfaces\IDataViewStrategy.cs" />
-    <Compile Include="Project\Interfaces\IHierarchyInterfaces.cs" />
     <Compile Include="Project\Interfaces\IItemConverter.cs" />
     <Compile Include="Project\Interfaces\ILayouter.cs" />
     <Compile Include="Project\Interfaces\IReportItem.cs" />
@@ -262,7 +259,6 @@
     <Compile Include="Project\Interfaces\IReportModel.cs" />
     <Compile Include="Project\Interfaces\ISinglePage.cs" />
     <Compile Include="Project\IReportCreator.cs" />
-    <Compile Include="Project\Printing\ExtendedPrintController.cs" />
     <Compile Include="Project\Printing\Graphics\BaseLine.cs" />
     <Compile Include="Project\Printing\Graphics\BaseShape.cs" />
     <Compile Include="Project\Printing\Graphics\Border.cs" />

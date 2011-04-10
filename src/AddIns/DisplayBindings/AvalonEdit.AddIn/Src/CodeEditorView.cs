@@ -13,6 +13,8 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Threading;
+
 using ICSharpCode.AvalonEdit.AddIn.Options;
 using ICSharpCode.AvalonEdit.AddIn.Snippets;
 using ICSharpCode.AvalonEdit.Editing;
@@ -24,6 +26,7 @@ using ICSharpCode.SharpDevelop.Dom;
 using ICSharpCode.SharpDevelop.Editor;
 using ICSharpCode.SharpDevelop.Editor.AvalonEdit;
 using ICSharpCode.SharpDevelop.Editor.Commands;
+using ICSharpCode.SharpDevelop.Gui;
 using ICSharpCode.SharpDevelop.Refactoring;
 using Ast = ICSharpCode.NRefactory.Ast;
 
@@ -34,31 +37,47 @@ namespace ICSharpCode.AvalonEdit.AddIn
 	/// There can be two CodeEditorView instances in a single CodeEditor if split-view
 	/// is enabled.
 	/// </summary>
-	public class CodeEditorView : SharpDevelopTextEditor
+	public class CodeEditorView : SharpDevelopTextEditor, IDisposable
 	{
 		public ITextEditor Adapter { get; set; }
 		
 		BracketHighlightRenderer bracketRenderer;
 		CaretReferencesRenderer caretReferencesRenderer;
 		ContextActionsRenderer contextActionsRenderer;
+		HiddenDefinition.HiddenDefinitionRenderer hiddenDefinitionRenderer;
 		
 		public CodeEditorView()
 		{
 			this.CommandBindings.Add(new CommandBinding(ApplicationCommands.Help, OnHelpExecuted));
 			
-			UpdateCustomizedHighlighting();
-			
 			this.bracketRenderer = new BracketHighlightRenderer(this.TextArea.TextView);
 			this.caretReferencesRenderer = new CaretReferencesRenderer(this);
 			this.contextActionsRenderer = new ContextActionsRenderer(this);
+			this.hiddenDefinitionRenderer = new HiddenDefinition.HiddenDefinitionRenderer(this);
+			
+			UpdateCustomizedHighlighting();
 			
 			this.MouseHover += TextEditorMouseHover;
 			this.MouseHoverStopped += TextEditorMouseHoverStopped;
 			this.MouseLeave += TextEditorMouseLeave;
 			this.TextArea.TextView.MouseDown += TextViewMouseDown;
 			this.TextArea.Caret.PositionChanged += HighlightBrackets;
+			this.TextArea.TextView.VisualLinesChanged += CodeEditorView_VisualLinesChanged;
 			
 			SetupTabSnippetHandler();
+		}
+
+		void CodeEditorView_VisualLinesChanged(object sender, EventArgs e)
+		{
+			// hide tooltip
+			if (this.toolTip != null)
+				this.toolTip.IsOpen = false;
+		}
+		
+		public virtual void Dispose()
+		{
+			contextActionsRenderer.Dispose();
+			hiddenDefinitionRenderer.Dispose();
 		}
 		
 		protected override string FileName {
@@ -94,6 +113,13 @@ namespace ICSharpCode.AvalonEdit.AddIn
 				if (this.Adapter.Language != null) {
 					var bracketSearchResult = this.Adapter.Language.BracketSearcher.SearchBracket(this.Adapter.Document, this.TextArea.Caret.Offset);
 					this.bracketRenderer.SetHighlight(bracketSearchResult);
+					
+					if (CodeEditorOptions.Instance.ShowHiddenDefinitions) {
+						this.hiddenDefinitionRenderer.BracketSearchResult = bracketSearchResult;
+						this.hiddenDefinitionRenderer.Show();
+					} else {
+						this.hiddenDefinitionRenderer.ClosePopup();
+					}
 				}
 			} else {
 				this.bracketRenderer.SetHighlight(null);
@@ -143,8 +169,10 @@ namespace ICSharpCode.AvalonEdit.AddIn
 						if (snippet != null) {
 							snippet.TrackUsage("CustomTabCommand");
 							
-							editor.Adapter.Document.Remove(wordStart, editor.CaretOffset - wordStart);
-							snippet.CreateAvalonEditSnippet(editor.Adapter).Insert(editor.TextArea);
+							using (editor.Document.RunUpdate()) {
+								editor.Adapter.Document.Remove(wordStart, editor.CaretOffset - wordStart);
+								snippet.CreateAvalonEditSnippet(editor.Adapter).Insert(editor.TextArea);
+							}
 							return;
 						}
 					}
@@ -321,6 +349,7 @@ namespace ICSharpCode.AvalonEdit.AddIn
 		{
 			popup = new Popup();
 			popup.Closed += PopupClosed;
+			popup.AllowsTransparency = true;
 			popup.PlacementTarget = this; // required for property inheritance
 			popup.Placement = PlacementMode.Absolute;
 			popup.StaysOpen = true;
@@ -382,43 +411,21 @@ namespace ICSharpCode.AvalonEdit.AddIn
 		}
 		#endregion
 		
-		#region Expand selection
+		#region CTRL+W extend selection
 		protected override void OnKeyUp(KeyEventArgs e)
 		{
 			base.OnKeyUp(e);
 			if (e.Handled) return;
 			if (e.Key == Key.W && Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) {
-				// Select AST Node
-				var editorLang = EditorContext.GetEditorLanguage(this.Adapter); if (editorLang == null) return;
-				var parser = ParserFactory.CreateParser(editorLang.Value, new StringReader(this.Text));
-				parser.ParseMethodBodies = true;
-				parser.Parse();
-				var parsedCU = parser.CompilationUnit; if (parsedCU == null) return;
-				//var caretLocation = new Location(this.Adapter.Caret.Column, this.Adapter.Caret.Line);
-				var selectionStart = this.Adapter.Document.OffsetToPosition(this.SelectionStart);
-				var selectionEnd = this.Adapter.Document.OffsetToPosition(this.SelectionStart + this.SelectionLength);
-				foreach (var node in parsedCU.Children) {
-					// fix StartLocation / EndLocation
-					node.AcceptVisitor(new ICSharpCode.NRefactory.Visitors.SetRegionInclusionVisitor(), null);
-				}
-				Ast.INode currentNode = parsedCU.Children.Select(
-					n => EditorContext.FindInnermostNodeContainingSelection(n, selectionStart, selectionEnd)).Where(n => n != null).FirstOrDefault();
-				if (currentNode == null) return;
-				
-				if (currentNode.StartLocation == selectionStart && currentNode.EndLocation == selectionEnd) {
-					// if whole node already selected, expand selection to parent
-					currentNode = currentNode.Parent;
-					if (currentNode == null)
-						return;
-				}
-				int startOffset, endOffset;
-				try {
-					startOffset = this.Adapter.Document.PositionToOffset(currentNode.StartLocation.Line, currentNode.StartLocation.Column);
-					endOffset = this.Adapter.Document.PositionToOffset(currentNode.EndLocation.Line, currentNode.EndLocation.Column);
-				} catch(ArgumentOutOfRangeException) {
-					return;
-				}
-				this.Select(startOffset, endOffset - startOffset);
+				CodeManipulation.ExtendSelection(this.Adapter);
+			}
+			if (e.SystemKey == Key.Up && Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) {
+				// Left Alt + Up (probably will have different shortcut)
+				CodeManipulation.MoveStatementUp(this.Adapter);
+			}
+			if (e.SystemKey == Key.Down && Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) {
+				// Left Alt + Down (probably will have different shortcut)
+				CodeManipulation.MoveStatementDown(this.Adapter);
 			}
 		}
 		#endregion
@@ -431,6 +438,23 @@ namespace ICSharpCode.AvalonEdit.AddIn
 			// the adapter sets the caret position and takes care of scrolling
 			this.Adapter.JumpTo(line, column);
 			this.Focus();
+			
+			if (CodeEditorOptions.Instance.EnableAnimations)
+				Dispatcher.Invoke(DispatcherPriority.Background, (Action)DisplayCaretHighlightAnimation);
+		}
+		
+		void DisplayCaretHighlightAnimation()
+		{
+			TextArea textArea = Adapter.GetService(typeof(TextArea)) as TextArea;
+			
+			if (textArea == null)
+				return;
+			
+			AdornerLayer layer = AdornerLayer.GetAdornerLayer(textArea.TextView);
+			CaretHighlightAdorner adorner = new CaretHighlightAdorner(textArea);
+			layer.Add(adorner);
+			
+			WorkbenchSingleton.CallLater(TimeSpan.FromSeconds(1), (Action)(() => layer.Remove(adorner)));
 		}
 		
 		#region UpdateParseInformation - Folding
@@ -486,6 +510,8 @@ namespace ICSharpCode.AvalonEdit.AddIn
 		{
 			string language = this.SyntaxHighlighting != null ? this.SyntaxHighlighting.Name : null;
 			CustomizableHighlightingColorizer.ApplyCustomizationsToDefaultElements(this, FetchCustomizations(language));
+			BracketHighlightRenderer.ApplyCustomizationsToRendering(this.bracketRenderer, FetchCustomizations(language));
+			HighlightingOptions.ApplyToFolding(this, FetchCustomizations(language));
 			this.TextArea.TextView.Redraw(); // manually redraw if default elements didn't change but customized highlightings did
 		}
 		

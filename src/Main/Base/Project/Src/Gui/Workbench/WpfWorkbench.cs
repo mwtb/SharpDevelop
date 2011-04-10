@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -95,7 +96,7 @@ namespace ICSharpCode.SharpDevelop.Gui
 			
 			mainMenu.ItemsSource = MenuService.CreateMenuItems(this, this, mainMenuPath, activationMethod: "MainMenu", immediatelyExpandMenuBuildersForShortcuts: true);
 			
-			toolBars = ToolBarService.CreateToolBars(this, "/SharpDevelop/Workbench/ToolBar");
+			toolBars = ToolBarService.CreateToolBars(this, this, "/SharpDevelop/Workbench/ToolBar");
 			foreach (ToolBar tb in toolBars) {
 				DockPanel.SetDock(tb, Dock.Top);
 				dockPanel.Children.Insert(1, tb);
@@ -528,26 +529,38 @@ namespace ICSharpCode.SharpDevelop.Gui
 		}
 		#endregion
 		
+		System.Windows.WindowState lastNonMinimizedWindowState = System.Windows.WindowState.Normal;
+		Rect restoreBoundsBeforeClosing;
+		
+		protected override void OnStateChanged(EventArgs e)
+		{
+			base.OnStateChanged(e);
+			if (this.WindowState != System.Windows.WindowState.Minimized)
+				lastNonMinimizedWindowState = this.WindowState;
+		}
+		
 		public Properties CreateMemento()
 		{
 			Properties prop = new Properties();
-			prop.Set("WindowState", this.WindowState);
-			if (this.WindowState == System.Windows.WindowState.Normal) {
-				prop.Set("Left", this.Left);
-				prop.Set("Top", this.Top);
-				prop.Set("Width", this.Width);
-				prop.Set("Height", this.Height);
+			prop.Set("WindowState", lastNonMinimizedWindowState);
+			var bounds = this.RestoreBounds;
+			if (bounds.IsEmpty) bounds = restoreBoundsBeforeClosing;
+			if (!bounds.IsEmpty) {
+				prop.Set("Bounds", bounds);
 			}
 			return prop;
 		}
 		
 		public void SetMemento(Properties memento)
 		{
-			this.Left = memento.Get("Left", 10.0);
-			this.Top = memento.Get("Top", 10.0);
-			this.Width = memento.Get("Width", 600.0);
-			this.Height = memento.Get("Height", 400.0);
-			this.WindowState = memento.Get("WindowState", System.Windows.WindowState.Maximized);
+			Rect bounds = memento.Get("Bounds", new Rect(10, 10, 750, 550));
+			bounds = FormLocationHelper.Validate(bounds);
+			this.Left = bounds.Left;
+			this.Top = bounds.Top;
+			this.Width = bounds.Width;
+			this.Height = bounds.Height;
+			lastNonMinimizedWindowState = memento.Get("WindowState", System.Windows.WindowState.Maximized);
+			this.WindowState = lastNonMinimizedWindowState;
 		}
 		
 		protected override void OnClosing(CancelEventArgs e)
@@ -572,6 +585,8 @@ namespace ICSharpCode.SharpDevelop.Gui
 				
 				Project.ProjectService.CloseSolution();
 				ParserService.StopParserThread();
+				
+				restoreBoundsBeforeClosing = this.RestoreBounds;
 				
 				this.WorkbenchLayout = null;
 				
@@ -609,13 +624,17 @@ namespace ICSharpCode.SharpDevelop.Gui
 		
 		DragDropEffects GetEffect(IDataObject data)
 		{
-			if (data != null && data.GetDataPresent(DataFormats.FileDrop)) {
-				string[] files = (string[])data.GetData(DataFormats.FileDrop);
-				foreach (string file in files) {
-					if (File.Exists(file)) {
-						return DragDropEffects.Link;
+			try {
+				if (data != null && data.GetDataPresent(DataFormats.FileDrop)) {
+					string[] files = (string[])data.GetData(DataFormats.FileDrop);
+					foreach (string file in files) {
+						if (File.Exists(file)) {
+							return DragDropEffects.Link;
+						}
 					}
 				}
+			} catch (COMException) {
+				// Ignore errors getting the data (e.g. happens when dragging attachments out of Thunderbird)
 			}
 			return DragDropEffects.None;
 		}
@@ -652,27 +671,26 @@ namespace ICSharpCode.SharpDevelop.Gui
 			#endif
 		}
 		
+		[Conditional("DEBUG")]
+		internal static void FocusDebug(string format, params object[] args)
+		{
+			#if DEBUG
+			if (enableFocusDebugOutput)
+				LoggingService.DebugFormatted(format, args);
+			#endif
+		}
+		
 		#if DEBUG
-		internal static bool enableFocusDebugOutput;
+		static bool enableFocusDebugOutput;
 		
 		void WpfWorkbench_PreviewGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
 		{
-			if (enableFocusDebugOutput) {
-				LoggingService.Debug("GotKeyboardFocus: oldFocus=" + e.OldFocus + ", newFocus=" + e.NewFocus);
-				if (e.NewFocus is IWorkbenchWindow)
-				{
-				}
-			}
+			FocusDebug("GotKeyboardFocus: oldFocus={0}, newFocus={1}", e.OldFocus, e.NewFocus);
 		}
 		
 		void WpfWorkbench_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
 		{
-			if (enableFocusDebugOutput) {
-				LoggingService.Debug("LostKeyboardFocus: oldFocus=" + e.OldFocus + ", newFocus=" + e.NewFocus);
-				if (e.NewFocus is IWorkbenchWindow)
-				{
-				}
-			}
+			FocusDebug("LostKeyboardFocus: oldFocus={0}, newFocus={1}", e.OldFocus, e.NewFocus);
 		}
 		
 		protected override void OnPreviewKeyDown(KeyEventArgs e)
@@ -688,10 +706,7 @@ namespace ICSharpCode.SharpDevelop.Gui
 				output.WriteLine("ActiveWorkbenchWindow = " + GetElementName(this.ActiveWorkbenchWindow));
 				((AvalonDockLayout)workbenchLayout).WriteState(output);
 				LoggingService.Debug(output.ToString());
-			}
-			if (!e.Handled && e.Key == Key.L && e.KeyboardDevice.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt)) {
-				this.UseLayoutRounding = !this.UseLayoutRounding;
-				this.StatusBar.SetMessage("UseLayoutRounding=" + this.UseLayoutRounding);
+				e.Handled = true;
 			}
 			if (!e.Handled && e.Key == Key.F && e.KeyboardDevice.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift | ModifierKeys.Alt)) {
 				if (TextOptions.GetTextFormattingMode(this) == TextFormattingMode.Display)
@@ -716,6 +731,7 @@ namespace ICSharpCode.SharpDevelop.Gui
 				this.StatusBar.SetMessage("TextRenderingMode=" + TextOptions.GetTextRenderingMode(this));
 			}
 		}
+		#endif
 		
 		internal static string GetElementName(object element)
 		{
@@ -724,6 +740,5 @@ namespace ICSharpCode.SharpDevelop.Gui
 			else
 				return element.GetType().FullName + ": " + element.ToString();
 		}
-		#endif
 	}
 }

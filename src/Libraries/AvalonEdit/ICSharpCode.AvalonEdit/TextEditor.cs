@@ -4,6 +4,7 @@
 using System;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -11,7 +12,10 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Markup;
+using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
+
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Editing;
 using ICSharpCode.AvalonEdit.Highlighting;
@@ -449,7 +453,7 @@ namespace ICSharpCode.AvalonEdit
 		
 		#region ShowLineNumbers
 		/// <summary>
-		/// IsReadOnly dependency property.
+		/// ShowLineNumbers dependency property.
 		/// </summary>
 		public static readonly DependencyProperty ShowLineNumbersProperty =
 			DependencyProperty.Register("ShowLineNumbers", typeof(bool), typeof(TextEditor),
@@ -468,8 +472,13 @@ namespace ICSharpCode.AvalonEdit
 			TextEditor editor = (TextEditor)d;
 			var leftMargins = editor.TextArea.LeftMargins;
 			if ((bool)e.NewValue) {
-				leftMargins.Insert(0, new LineNumberMargin());
-				leftMargins.Insert(1, DottedLineMargin.Create());
+				LineNumberMargin lineNumbers = new LineNumberMargin();
+				Line line = (Line)DottedLineMargin.Create();
+				leftMargins.Insert(0, lineNumbers);
+				leftMargins.Insert(1, line);
+				var lineNumbersForeground = new Binding("LineNumbersForeground") { Source = editor };
+				line.SetBinding(Line.StrokeProperty, lineNumbersForeground);
+				lineNumbers.SetBinding(Control.ForegroundProperty, lineNumbersForeground);
 			} else {
 				for (int i = 0; i < leftMargins.Count; i++) {
 					if (leftMargins[i] is LineNumberMargin) {
@@ -480,6 +489,33 @@ namespace ICSharpCode.AvalonEdit
 						break;
 					}
 				}
+			}
+		}
+		#endregion
+		
+		#region LineNumbersForeground
+		/// <summary>
+		/// LineNumbersForeground dependency property.
+		/// </summary>
+		public static readonly DependencyProperty LineNumbersForegroundProperty =
+			DependencyProperty.Register("LineNumbersForeground", typeof(Brush), typeof(TextEditor),
+			                            new FrameworkPropertyMetadata(Brushes.Gray, OnLineNumbersForegroundChanged));
+		
+		/// <summary>
+		/// Gets/sets the Brush used for displaying the foreground color of line numbers.
+		/// </summary>
+		public Brush LineNumbersForeground {
+			get { return (Brush)GetValue(LineNumbersForegroundProperty); }
+			set { SetValue(LineNumbersForegroundProperty, value); }
+		}
+		
+		static void OnLineNumbersForegroundChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+		{
+			TextEditor editor = (TextEditor)d;
+			var lineNumberMargin = editor.TextArea.LeftMargins.FirstOrDefault(margin => margin is LineNumberMargin) as LineNumberMargin;;
+			
+			if (lineNumberMargin != null) {
+				lineNumberMargin.SetValue(Control.ForegroundProperty, e.NewValue);
 			}
 		}
 		#endregion
@@ -1068,6 +1104,11 @@ namespace ICSharpCode.AvalonEdit
 			TextView textView = textArea.TextView;
 			TextDocument document = textView.Document;
 			if (scrollViewer != null && document != null) {
+				if (line < 1)
+					line = 1;
+				if (line > document.LineCount)
+					line = document.LineCount;
+				
 				IScrollInfo scrollInfo = textView;
 				if (!scrollInfo.CanHorizontallyScroll) {
 					// Word wrap is enabled. Ensure that we have up-to-date info about line height so that we scroll

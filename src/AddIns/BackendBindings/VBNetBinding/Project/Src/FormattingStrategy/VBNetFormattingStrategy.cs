@@ -23,6 +23,7 @@ namespace ICSharpCode.VBNetBinding
 	/// </summary>
 	public class VBNetFormattingStrategy : DefaultFormattingStrategy
 	{
+		#region VB Statements
 		static readonly List<VBStatement> statements;
 		
 		internal static List<VBStatement> Statements {
@@ -85,6 +86,7 @@ namespace ICSharpCode.VBNetBinding
 				Tokens.If, Tokens.For, Tokens.Do, Tokens.While, Tokens.With, Tokens.Select, Tokens.Try,
 				Tokens.Property, Tokens.Get, Tokens.Set
 			});
+		#endregion
 		
 		bool doCasing;
 		bool doInsertion;
@@ -134,16 +136,20 @@ namespace ICSharpCode.VBNetBinding
 			IDocumentLine currentLine = editor.Document.GetLine(lineNr);
 			IDocumentLine lineAbove = lineNr > 1 ? editor.Document.GetLine(lineNr - 1) : null;
 			
-			string curLineText = editor.Document.Text;
+			string curLineText = currentLine == null ? "" : currentLine.Text;
 			string lineAboveText = lineAbove == null ? "" : lineAbove.Text;
 			
 			if (ch == '\'') {
 				InsertDocumentationComments(editor, lineNr, cursorOffset);
 			}
 			
-			if (ch == '\n' && lineAboveText != null)
-			{
-				string textToReplace = TrimLine(lineAboveText);
+			if (ch == '\n' && lineAboveText != null) {
+				if (LanguageUtils.IsInsideDocumentationComment(editor, lineAbove, lineAbove.EndOffset)) {
+					editor.Document.Insert(cursorOffset, "''' ");
+					return;
+				}
+				
+				string textToReplace = lineAboveText.TrimLine();
 				
 				if (doCasing)
 					DoCasingOnLine(lineAbove, textToReplace, editor);
@@ -153,12 +159,10 @@ namespace ICSharpCode.VBNetBinding
 				
 				if (IsInString(lineAboveText)) {
 					if (IsFinishedString(curLineText)) {
-						editor.Document.Insert(lineAbove.Offset + lineAbove.Length,
-						                       "\" & _");
+						editor.Document.Insert(lineAbove.EndOffset, "\" & _");
 						editor.Document.Insert(currentLine.Offset, "\"");
 					} else {
-						editor.Document.Insert(lineAbove.Offset + lineAbove.Length,
-						                       "\"");
+						editor.Document.Insert(lineAbove.EndOffset, "\"");
 					}
 				} else {
 					string indent = DocumentUtilitites.GetWhitespaceAfter(editor.Document, lineAbove.Offset);
@@ -170,11 +174,8 @@ namespace ICSharpCode.VBNetBinding
 				}
 				
 				IndentLines(editor, lineNr - 1, lineNr);
-			}
-			else if(ch == '>')
-			{
-				if (IsInsideDocumentationComment(editor, currentLine, cursorOffset))
-				{
+			} else if(ch == '>') {
+				if (LanguageUtils.IsInsideDocumentationComment(editor, currentLine, cursorOffset)) {
 					int column = editor.Caret.Offset - currentLine.Offset;
 					int index = Math.Min(column - 1, curLineText.Length - 1);
 					
@@ -187,30 +188,20 @@ namespace ICSharpCode.VBNetBinding
 					if (index > 0) {
 						StringBuilder commentBuilder = new StringBuilder("");
 						for (int i = index; i < curLineText.Length && i < column && !Char.IsWhiteSpace(curLineText[i]); ++i) {
-							commentBuilder.Append(curLineText[ i]);
+							commentBuilder.Append(curLineText[i]);
 						}
 						string tag = commentBuilder.ToString().Trim();
 						if (!tag.EndsWith(">", StringComparison.OrdinalIgnoreCase)) {
 							tag += ">";
 						}
 						if (!tag.StartsWith("/", StringComparison.OrdinalIgnoreCase)) {
-							editor.Document.Insert(editor.Caret.Offset, "</" + tag.Substring(1));
+							string endTag = "</" + tag.Substring(1);
+							editor.Document.Insert(editor.Caret.Offset, endTag);
+							editor.Caret.Offset -= endTag.Length;
 						}
 					}
 				}
 			}
-		}
-
-		internal static string TrimLine(string lineText)
-		{
-			string textToReplace = lineText;
-			// remove string content
-			MatchCollection strmatches = Regex.Matches(lineText, "\"[^\"]*?\"", RegexOptions.Singleline);
-			foreach (Match match in strmatches) {
-				textToReplace = textToReplace.Remove(match.Index, match.Length).Insert(match.Index, new String('-', match.Length));
-			}
-			// remove comments
-			return Regex.Replace(textToReplace, "'.*$", "", RegexOptions.Singleline);
 		}
 
 		void DoInsertionOnLine(string terminator, IDocumentLine currentLine, IDocumentLine lineAbove, string textToReplace, ITextEditor editor, int lineNr)
@@ -419,7 +410,6 @@ namespace ICSharpCode.VBNetBinding
 			while ((currentToken = lexer.NextToken()).Kind != Tokens.EOF) {
 				if (prevToken == null)
 					prevToken = currentToken;
-				
 				if (IsBlockStart(lexer, currentToken, prevToken)) {
 					if ((tokens.Count > 0 && tokens.Peek().Kind != Tokens.Interface) || IsDeclaration(currentToken.Kind))
 						tokens.Push(currentToken);
@@ -481,7 +471,7 @@ namespace ICSharpCode.VBNetBinding
 			
 			string text = lineSeg.Text;
 			
-			if (StripComment(text).Trim(' ', '\t', '\r', '\n').EndsWith("_", StringComparison.OrdinalIgnoreCase))
+			if (text.TrimComments().Trim(' ', '\t', '\r', '\n').EndsWith("_", StringComparison.OrdinalIgnoreCase))
 				return true;
 			else
 				return false;
@@ -515,26 +505,6 @@ namespace ICSharpCode.VBNetBinding
 			return empty && match;
 		}
 		
-		static string StripComment(string text)
-		{
-			return Regex.Replace(text, "'.*$", "", RegexOptions.Singleline).Trim();
-		}
-		
-		static bool IsInsideDocumentationComment(ITextEditor editor, IDocumentLine curLine, int cursorOffset)
-		{
-			for (int i = curLine.Offset; i < cursorOffset; ++i) {
-				char ch = editor.Document.GetCharAt(i);
-				if (ch == '"') {
-					return false;
-				}
-				if (ch == '\'' && i + 2 < cursorOffset && editor.Document.GetCharAt(i + 1) == '\'' && editor.Document.GetCharAt(i + 2) == '\'')
-				{
-					return true;
-				}
-			}
-			return false;
-		}
-		
 		public override void IndentLines(ITextEditor editor, int begin, int end)
 		{
 			SmartIndentInternal(editor, begin, end);
@@ -545,10 +515,9 @@ namespace ICSharpCode.VBNetBinding
 			ILexer lexer = ParserFactory.CreateLexer(SupportedLanguage.VBNet, new StringReader(editor.Document.Text));
 			
 			Stack<string> indentation = new Stack<string>();
-			
 			indentation.Push(string.Empty);
 			
-			int oldLine = 1;
+			List<int> eols = new List<int>();
 			
 			bool inInterface = false;
 			bool isMustOverride = false;
@@ -557,6 +526,9 @@ namespace ICSharpCode.VBNetBinding
 			
 			Token currentToken = null;
 			Token prevToken = null;
+			
+			int blockStart = 1;
+			int lambdaNesting = 0;
 			
 			while ((currentToken = lexer.NextToken()).Kind != Tokens.EOF) {
 				if (prevToken == null)
@@ -571,11 +543,29 @@ namespace ICSharpCode.VBNetBinding
 				if (currentToken.Kind == Tokens.Declare)
 					isDeclare = true;
 				
-				if (currentToken.Kind == Tokens.EOL)
+				if (currentToken.Kind == Tokens.EOL) {
 					isDelegate = isDeclare = isMustOverride = false;
+					eols.Add(currentToken.Location.Line);
+				}
 				
 				if (IsBlockEnd(currentToken, prevToken)) {
-					ApplyToRange(editor, indentation, oldLine, currentToken.Location.Line, begin, end);
+					// indent the lines inside the block
+					// this is an End-statement
+					// hence we indent from blockStart to the previous line
+					int blockEnd = currentToken.Location.Line - 1;
+					
+					// if this is a lambda end include End-Statement in block
+//					if (lambdaNesting > 0 && (currentToken.Kind == Tokens.Function || currentToken.Kind == Tokens.Sub)) {
+//						blockEnd++;
+//					}
+					
+					ApplyToRange(editor, indentation, eols, blockStart, blockEnd, begin, end);
+					
+					if (lambdaNesting > 0 && (currentToken.Kind == Tokens.Function || currentToken.Kind == Tokens.Sub)) {
+						Unindent(indentation);
+						
+						ApplyToRange(editor, indentation, eols, currentToken.Location.Line, currentToken.Location.Line, begin, end);
+					}
 					
 					if (currentToken.Kind == Tokens.Interface)
 						inInterface = false;
@@ -587,12 +577,31 @@ namespace ICSharpCode.VBNetBinding
 							Unindent(indentation);
 					}
 					
-					oldLine = currentToken.Location.Line;
+					// block start is this line (for the lines between two blocks)
+					blockStart = currentToken.Location.Line;
+					
+					if (lambdaNesting > 0 && (currentToken.Kind == Tokens.Function || currentToken.Kind == Tokens.Sub)) {
+						blockStart++;
+						lambdaNesting--;
+					}
 				}
 				
-				if (IsBlockStart(lexer, currentToken, prevToken)) {
-					int line = GetLastVisualLine(currentToken.Location.Line, editor);
-					ApplyToRange(editor, indentation, oldLine, line, begin, end);
+				bool isMultiLineLambda;
+				if (IsBlockStart(lexer, currentToken, prevToken, out isMultiLineLambda)) {
+					// indent the lines between the last and this block
+					// this is a Begin-statement
+					// hence we indent from blockStart to the this line
+					int lastVisualLine = FindNextEol(lexer);
+					eols.Add(lastVisualLine);
+					ApplyToRange(editor, indentation, eols, blockStart, lastVisualLine, begin, end);
+					
+					if (isMultiLineLambda && (currentToken.Kind == Tokens.Function || currentToken.Kind == Tokens.Sub)) {
+						lambdaNesting++;
+						int endColumn = currentToken.Location.Column;
+						int startColumn = DocumentUtilitites.GetWhitespaceAfter(editor.Document, editor.Document.GetLine(lastVisualLine).Offset).Length;
+						if (startColumn < endColumn)
+							Indent(editor, indentation, new string(' ', endColumn - startColumn - 1));
+					}
 					
 					if (!inInterface && !isMustOverride && !isDeclare && !isDelegate) {
 						Indent(editor, indentation);
@@ -604,31 +613,78 @@ namespace ICSharpCode.VBNetBinding
 					if (currentToken.Kind == Tokens.Interface)
 						inInterface = true;
 					
-					oldLine = line + 1;
+					// block start is the following line (for the lines inside a block)
+					blockStart = lastVisualLine + 1;
 				}
 				
 				prevToken = currentToken;
 			}
 			
-			// do last indent step
-			int newLine = prevToken.Location.Line;
-			
-			if (oldLine > newLine)
-				newLine = oldLine;
-			
-			ApplyToRange(editor, indentation, oldLine, newLine, begin, end);
+			ApplyToRange(editor, indentation, eols, blockStart, editor.Document.TotalNumberOfLines, begin, end);
 			
 			return (indentation.PeekOrDefault() ?? string.Empty).Length;
 		}
 		
-		static int GetLastVisualLine(int line, ITextEditor area)
+		static int FindNextEol(ILexer lexer)
 		{
-			string text = StripComment(area.Document.GetLine(line).Text);
-			while (text.EndsWith("_", StringComparison.Ordinal)) {
-				line++;
-				text = StripComment(area.Document.GetLine(line).Text);
+			lexer.StartPeek();
+			
+			Token t = lexer.Peek();
+			
+			while (t.Kind != Tokens.EOL)
+				t = lexer.Peek();
+			
+			return t.Location.Line;
+		}
+		
+		static void ApplyToRange(ITextEditor editor, Stack<string> indentation, List<int> eols, int blockStart, int blockEnd, int selectionStart, int selectionEnd) {
+			LoggingService.InfoFormatted("indenting line {0} to {1} with {2}", blockStart, blockEnd, (indentation.PeekOrDefault() ?? "").Length);
+			
+			int nextEol = -1;
+			bool wasMultiLine = false;
+			
+			for (int i = blockStart; i <= blockEnd; i++) {
+				IDocumentLine curLine = editor.Document.GetLine(i);
+				string lineText = curLine.Text.TrimStart();
+				string noComments = lineText.TrimComments().TrimEnd();
+				
+				// adjust indentation if the current line is not selected
+				// lines between the selection will be aligned to the selected level
+				if (i < selectionStart || i > selectionEnd) {
+					indentation.PopOrDefault();
+					indentation.Push(DocumentUtilitites.GetWhitespaceAfter(editor.Document, curLine.Offset));
+				}
+				
+				// look for next eol if line is not empty
+				// (the lexer does not produce eols for empty lines)
+				if (!string.IsNullOrEmpty(noComments) && i >= nextEol) {
+					int search = eols.BinarySearch(i);
+					if (search < 0)
+						search = ~search;
+					nextEol = search < eols.Count ? eols[search] : i;
+				}
+				
+				// remove indentation in last line of multiline array(, collection, object) initializers
+				if (i == nextEol && wasMultiLine && noComments == "}") {
+					wasMultiLine = false;
+					Unindent(indentation);
+				}
+				
+				// apply the indentation
+				editor.Document.SmartReplaceLine(curLine, (indentation.PeekOrDefault() ?? "") + lineText);
+				
+				// indent line if it is ended by (implicit) line continuation
+				if (i < nextEol && !wasMultiLine) {
+					wasMultiLine = true;
+					Indent(editor, indentation);
+				}
+				
+				// unindent if this is the last line of a multiline statement
+				if (i == nextEol && wasMultiLine) {
+					wasMultiLine = false;
+					Unindent(indentation);
+				}
 			}
-			return line;
 		}
 
 		static void Unindent(Stack<string> indentation)
@@ -636,13 +692,21 @@ namespace ICSharpCode.VBNetBinding
 			indentation.PopOrDefault();
 		}
 
-		static void Indent(ITextEditor editor, Stack<string> indentation)
+		static void Indent(ITextEditor editor, Stack<string> indentation, string indent = null)
 		{
-			indentation.Push((indentation.PeekOrDefault() ?? string.Empty) + editor.Options.IndentationString);
+			indentation.Push((indentation.PeekOrDefault() ?? string.Empty) + (indent ?? editor.Options.IndentationString));
 		}
 		
 		internal static bool IsBlockStart(ILexer lexer, Token current, Token prev)
 		{
+			bool tmp;
+			return IsBlockStart(lexer, current, prev, out tmp);
+		}
+		
+		static bool IsBlockStart(ILexer lexer, Token current, Token prev, out bool isMultiLineLambda)
+		{
+			isMultiLineLambda = false;
+			
 			if (blockTokens.Contains(current.Kind)) {
 				if (current.Kind == Tokens.If) {
 					if (prev.Kind != Tokens.EOL)
@@ -658,10 +722,33 @@ namespace ICSharpCode.VBNetBinding
 					}
 				}
 				
-				if (current.Kind == Tokens.Function) {
+				// check if it is a lambda
+				if (current.Kind == Tokens.Function || current.Kind == Tokens.Sub) {
 					lexer.StartPeek();
 					
-					if (lexer.Peek().Kind == Tokens.OpenParenthesis)
+					bool isSingleLineLambda = false;
+					
+					if (lexer.Peek().Kind == Tokens.OpenParenthesis) {
+						isSingleLineLambda = true;
+						
+						int brackets = 1;
+						
+						// look for end of parameter list
+						while (brackets > 0) {
+							var t = lexer.Peek();
+							if (t.Kind == Tokens.OpenParenthesis)
+								brackets++;
+							if (t.Kind == Tokens.CloseParenthesis)
+								brackets--;
+						}
+						
+						// expression is multi-line lambda if next Token is EOL
+						if (brackets == 0)
+							return isMultiLineLambda = (lexer.Peek().Kind == Tokens.EOL);
+					}
+					
+					// do not indent if current token is start of single-line lambda
+					if (isSingleLineLambda)
 						return false;
 				}
 				
@@ -745,41 +832,6 @@ namespace ICSharpCode.VBNetBinding
 			}
 			
 			return false;
-		}
-		
-		static void ApplyToRange(ITextEditor editor, Stack<string> indentation, int begin, int end, int selBegin, int selEnd)
-		{
-			bool multiLine = false;
-			
-			for (int i = begin; i <= end; i++) {
-				IDocumentLine curLine = editor.Document.GetLine(i);
-				string lineText = curLine.Text.Trim(' ', '\t', '\r', '\n');
-				string noComments = StripComment(lineText).TrimEnd(' ', '\t', '\r', '\n');
-				
-				if (i < selBegin || i > selEnd) {
-					indentation.PopOrDefault();
-					indentation.Push(DocumentUtilitites.GetWhitespaceAfter(editor.Document, curLine.Offset));
-				}
-				
-				// change indentation before (indent this line)
-				if (multiLine && noComments.EndsWith("}", StringComparison.OrdinalIgnoreCase)) {
-					Unindent(indentation);
-					multiLine = false;
-				}
-				
-				editor.Document.SmartReplaceLine(curLine, (indentation.PeekOrDefault() ?? string.Empty) + lineText);
-				
-				// change indentation afterwards (indent next line)
-				if (!multiLine && noComments.EndsWith("_", StringComparison.OrdinalIgnoreCase)) {
-					Indent(editor, indentation);
-					multiLine = true;
-				}
-
-				if (multiLine && !noComments.EndsWith("_", StringComparison.OrdinalIgnoreCase)) {
-					multiLine = false;
-					Unindent(indentation);
-				}
-			}
 		}
 		
 		/// <summary>

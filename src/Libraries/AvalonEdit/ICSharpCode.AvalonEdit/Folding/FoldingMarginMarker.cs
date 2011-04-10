@@ -92,6 +92,7 @@ namespace ICSharpCode.AvalonEdit.Folding
 				                        new Point(middleX, rect.Top + space),
 				                        new Point(middleX, rect.Bottom - space));
 			}
+
 		}
 		
 		protected override void OnIsMouseDirectlyOverChanged(DependencyPropertyChangedEventArgs e)

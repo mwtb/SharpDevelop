@@ -13,15 +13,14 @@ namespace ICSharpCode.Reports.Core.Exporter
 	{
 		IDataManager dataManager;
 		IDataNavigator dataNavigator;
-
+		
 		readonly object addLock = new object();
 		
-		//internal delegate ExporterCollection ConverterDelegate (BaseSection s);
 		
 		#region Constructor
 		
-		
-		public static IReportCreator CreateInstance(IReportModel reportModel, IDataManager dataManager,ILayouter layouter)
+		public static IReportCreator CreateInstance(IReportModel reportModel, IDataManager dataManager)
+//		public static IReportCreator CreateInstance(IReportModel reportModel, IDataManager dataManager,ILayouter layouter)
 		{
 			if (reportModel == null) {
 				throw new ArgumentNullException("reportModel");
@@ -29,15 +28,12 @@ namespace ICSharpCode.Reports.Core.Exporter
 			if (dataManager == null) {
 				throw new ArgumentNullException("dataManager");
 			}
-			if (layouter == null) {
-				throw new ArgumentNullException("layouter");
-			}
-			DataPageBuilder instance = new DataPageBuilder(reportModel,dataManager,layouter);
+			DataPageBuilder instance = new DataPageBuilder(reportModel,dataManager);
 			return instance;
 		}
 		
 		
-		private DataPageBuilder (IReportModel reportModel,IDataManager dataManager,ILayouter layouter):base(reportModel,layouter) 
+		private DataPageBuilder (IReportModel reportModel,IDataManager dataManager):base(reportModel) 
 		{
 			this.dataManager = dataManager;
 		}
@@ -89,8 +85,32 @@ namespace ICSharpCode.Reports.Core.Exporter
 		
 		protected override void BuildReportFooter (Rectangle footerRectangle)
 		{
-			base.ReportModel.ReportFooter.SectionOffset = footerRectangle.Top;
-			ExporterCollection convertedList = base.ConvertSection (base.ReportModel.ReportFooter,this.dataNavigator.CurrentRow);
+			bool pageBreak = false;
+			
+			base.ReportModel.ReportFooter.SectionOffset = footerRectangle.Top + GlobalValues.GapBetweenContainer;
+			
+			if (!PrintHelper.IsRoomForFooter(base.SectionBounds,base.ReportModel.ReportFooter.Location)) {
+				PageBreak();
+				base.ReportModel.ReportFooter.SectionOffset = SectionBounds.DetailStart.Y;
+				pageBreak = true;
+			}
+			
+			ExporterCollection convertedList = new ExporterCollection();
+			var section = base.ReportModel.DetailSection;
+			var table = section.Items[0] as BaseTableItem;
+			if (table != null) {
+				if (pageBreak) {
+					// Print the HeaderRow
+					var headerRow = table.Items[0];
+					
+
+					var curPos = BaseConverter.ConvertContainer(convertedList,(ISimpleContainer)headerRow,SectionBounds.PageHeaderRectangle.Left,SectionBounds.PageHeaderRectangle.Location);
+					base.SinglePage.Items.AddRange(convertedList);
+					base.ReportModel.ReportFooter.SectionOffset = curPos.Y + GlobalValues.GapBetweenContainer;
+				}
+			}
+			//allways print the reportFooter
+			convertedList = base.ConvertSection (base.ReportModel.ReportFooter,this.dataNavigator.CurrentRow);
 			base.SinglePage.Items.AddRange(convertedList);
 		}
 		
@@ -101,7 +121,6 @@ namespace ICSharpCode.Reports.Core.Exporter
 			ExporterCollection convertedList = convertedList = base.ConvertSection (base.ReportModel.PageFooter,this.dataNavigator.CurrentRow);
 			base.SinglePage.Items.AddRange(convertedList);
 		}
-		
 		
 		
 		protected  Point BuildDetail (BaseSection section,IDataNavigator dataNavigator)		
@@ -115,9 +134,12 @@ namespace ICSharpCode.Reports.Core.Exporter
 				                                                                base.Layouter);
 				
 				if (baseConverter != null) {
-					
-					
+			
 					baseConverter.SectionRendering += OnSectionRendering;
+					baseConverter.GroupHeaderRendering += OnGroupHeaderRendering;
+					baseConverter.GroupFooterRendering += OnGroupFooterRendering;
+					baseConverter.RowRendering += OnRowRendering;
+					
 					baseConverter.Graphics = base.Graphics;
 					baseConverter.PageFull += new EventHandler<NewPageEventArgs>(OnPageFull);
 					
@@ -133,11 +155,33 @@ namespace ICSharpCode.Reports.Core.Exporter
 		
 		void OnSectionRendering (object sender,SectionRenderEventArgs e)
 		{
+//			Console.WriteLine("Datapagebuilder : OnSectionRendering");
 			base.FireSectionRenderEvent(e.Section,e.RowNumber);
 		}
+		
+		
+		void OnGroupHeaderRendering (object sender, GroupHeaderEventArgs ghea)
+		{
 			
-			
+//			Console.WriteLine("Datapagebuilder : OnGroupHeaderRendering");
+			base.FireGroupHeaderEvent(ghea);
+		}
+		
+		
+		void OnGroupFooterRendering (object sender, GroupFooterEventArgs gfea)
+		{
+//			Console.WriteLine ("DatapageBuilder : OnGroupFooterEvent");
+			base.FireGroupFooterEvent(gfea);
+		}
+		
+		
+		void OnRowRendering (object sender,RowRenderEventArgs rrea)
+		{
+//				Console.WriteLine("Datapagebuilder : OnRowRendering");
+				base.FireRowRenderEvent(rrea);
+		}
 		#endregion
+		
 		
 		private void WritePages ()
 		{
@@ -168,7 +212,6 @@ namespace ICSharpCode.Reports.Core.Exporter
 			this.AddPage(base.SinglePage);
 			this.BuildNewPage ();
 		}
-		
 		
 		
 		#region Public Methodes

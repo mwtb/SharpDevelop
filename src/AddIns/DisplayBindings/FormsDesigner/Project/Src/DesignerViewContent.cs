@@ -12,11 +12,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-
 using ICSharpCode.Core;
 using ICSharpCode.FormsDesigner.Services;
 using ICSharpCode.FormsDesigner.UndoRedo;
 using ICSharpCode.SharpDevelop;
+using ICSharpCode.SharpDevelop.Dom;
 using ICSharpCode.SharpDevelop.Editor;
 using ICSharpCode.SharpDevelop.Gui;
 
@@ -277,7 +277,7 @@ namespace ICSharpCode.FormsDesigner
 			serviceContainer.AddService(typeof(DesignerOptionService), new SharpDevelopDesignerOptionService());
 			serviceContainer.AddService(typeof(ITypeDiscoveryService), new TypeDiscoveryService());
 			serviceContainer.AddService(typeof(MemberRelationshipService), new DefaultMemberRelationshipService());
-			serviceContainer.AddService(typeof(ProjectResourceService), new ProjectResourceService(ParserService.GetParseInformation(this.DesignerCodeFile.FileName).CompilationUnit.ProjectContent));
+			serviceContainer.AddService(typeof(ProjectResourceService), CreateProjectResourceService());
 			
 			// Provide the ImageResourceEditor for all Image and Icon properties
 			this.addedTypeDescriptionProviders.Add(typeof(Image), TypeDescriptor.AddAttributes(typeof(Image), new EditorAttribute(typeof(ImageResourceEditor), typeof(System.Drawing.Design.UITypeEditor))));
@@ -329,6 +329,21 @@ namespace ICSharpCode.FormsDesigner
 			LoggingService.Info("Form Designer: END INITIALIZE");
 		}
 		
+		ProjectResourceService CreateProjectResourceService()
+		{
+			IProjectContent projectContent = GetProjectContentForFile();
+			return new ProjectResourceService(projectContent);
+		}
+		
+		IProjectContent GetProjectContentForFile()
+		{
+			ParseInformation parseInfo = ParserService.GetParseInformation(this.DesignerCodeFile.FileName);
+			if (parseInfo != null) {
+				return parseInfo.CompilationUnit.ProjectContent;
+			}
+			return DefaultProjectContent.DummyProjectContent;
+		}
+		
 		bool hasUnmergedChanges;
 		
 		void MakeDirty()
@@ -336,6 +351,7 @@ namespace ICSharpCode.FormsDesigner
 			hasUnmergedChanges = true;
 			this.DesignerCodeFile.MakeDirty();
 			this.resourceStore.MarkResourceFilesAsDirty();
+			System.Windows.Input.CommandManager.InvalidateRequerySuggested();
 		}
 		
 		bool shouldUpdateSelectableObjects = false;
@@ -481,8 +497,33 @@ namespace ICSharpCode.FormsDesigner
 		}
 		
 		internal new Control UserContent {
-			get { return base.UserContent as Control; }
-			set { base.UserContent = value; }
+			get {
+				SDWindowsFormsHost host = base.UserContent as SDWindowsFormsHost;
+				return host != null ? host.Child : null;
+			}
+			set {
+				SDWindowsFormsHost host = base.UserContent as SDWindowsFormsHost;
+				if (value == null) {
+					base.UserContent = null;
+					if (host != null)
+						host.Dispose();
+					return;
+				}
+				if (host != null) {
+					if (host.IsDisposed) {
+						host = null;
+					} else if (host.Child == value) {
+						return;
+					}
+				}
+				if (host == null) {
+					host = new SDWindowsFormsHost(true);
+					host.ServiceObject = this;
+					host.DisposeChild = false;
+				}
+				host.Child = value;
+				base.UserContent = host;
+			}
 		}
 		
 		void DesignerLoading(object sender, EventArgs e)
@@ -686,6 +727,7 @@ namespace ICSharpCode.FormsDesigner
 			object[] selArray = new object[selection.Count];
 			selection.CopyTo(selArray, 0);
 			propertyContainer.SelectedObjects = selArray;
+			System.Windows.Input.CommandManager.InvalidateRequerySuggested();
 		}
 		
 		protected void UpdatePropertyPad()

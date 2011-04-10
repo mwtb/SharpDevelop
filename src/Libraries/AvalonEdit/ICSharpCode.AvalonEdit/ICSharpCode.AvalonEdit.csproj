@@ -258,6 +258,7 @@
       <DependentUpon>TextView.cs</DependentUpon>
     </Compile>
     <Compile Include="Rendering\LinkElementGenerator.cs" />
+    <Compile Include="Rendering\MouseHoverLogic.cs" />
     <Compile Include="Rendering\NewLineElementGenerator.cs" />
     <Compile Include="Rendering\SimpleTextSource.cs">
       <DependentUpon>FormattedTextElement.cs</DependentUpon>
@@ -343,6 +344,7 @@
     <Compile Include="Utils\Rope.cs" />
     <Compile Include="Utils\RopeNode.cs" />
     <Compile Include="Utils\RopeTextReader.cs" />
+    <Compile Include="Utils\StringSegment.cs" />
     <Compile Include="Utils\TextFormatterFactory.cs" />
     <Compile Include="Utils\WeakEventManagerBase.cs" />
     <Compile Include="Utils\PixelSnapHelpers.cs" />
