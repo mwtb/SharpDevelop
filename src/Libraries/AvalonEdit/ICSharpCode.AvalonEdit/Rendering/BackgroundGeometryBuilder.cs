@@ -114,12 +114,12 @@ namespace ICSharpCode.AvalonEdit.Rendering
 					double y = vl.GetTextLineVisualYPosition(line, VisualYPosition.LineTop);
 					int visualStartCol = vl.GetTextLineVisualStartColumn(line);
 					int visualEndCol = visualStartCol + line.Length;
-					if (line != lastTextLine)
-						visualEndCol -= line.TrailingWhitespaceLength;
+					//if (line != lastTextLine)
+					//	visualEndCol -= line.TrailingWhitespaceLength;
 					
-					if (segmentEndVC < visualStartCol)
+					if (segmentEndVC <= visualStartCol)
 						break;
-					if (segmentStartVC > visualEndCol)
+					if (segmentStartVC >= visualEndCol)
 						continue;
 					int segmentStartVCInLine = Math.Max(segmentStartVC, visualStartCol);
 					int segmentEndVCInLine = Math.Min(segmentEndVC, visualEndCol);

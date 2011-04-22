@@ -139,7 +139,7 @@ namespace ICSharpCode.AvalonEdit.Editing
 			DocumentLine caretLine = textArea.Document.GetLineByNumber(textArea.Caret.Line);
 			VisualLine visualLine = textArea.TextView.GetOrConstructVisualLine(caretLine);
 			TextViewPosition caretPosition = textArea.Caret.Position;
-			TextLine textLine = visualLine.GetTextLine(caretPosition.VisualColumn);
+			TextLine textLine = visualLine.GetTextLine(caretPosition.VisualColumn,caretPosition.PositionAtLineEnd);
 			switch (direction) {
 				case CaretMovementType.CharLeft:
 					MoveCaretLeft(textArea, caretPosition, visualLine, CaretPositioningMode.Normal);
@@ -194,7 +194,7 @@ namespace ICSharpCode.AvalonEdit.Editing
 		{
 			int newVC = visualLine.VisualLength;
 			int offset = visualLine.FirstDocumentLine.Offset + visualLine.GetRelativeOffset(newVC);
-			SetCaretPosition(textArea, newVC, offset);
+			SetCaretPosition(textArea, newVC, offset, true);
 		}
 		#endregion
 		
@@ -202,8 +202,9 @@ namespace ICSharpCode.AvalonEdit.Editing
 		static void MoveCaretRight(TextArea textArea, TextViewPosition caretPosition, VisualLine visualLine, CaretPositioningMode mode)
 		{
 			int pos = visualLine.GetNextCaretPosition(caretPosition.VisualColumn, LogicalDirection.Forward, mode);
+			
 			if (pos >= 0) {
-				SetCaretPosition(textArea, pos, visualLine.GetRelativeOffset(pos) + visualLine.FirstDocumentLine.Offset);
+				SetCaretPosition(textArea, pos, visualLine.GetRelativeOffset(pos) + visualLine.FirstDocumentLine.Offset );
 			} else {
 				// move to start of next line
 				DocumentLine nextDocumentLine = visualLine.LastDocumentLine.NextLine;
@@ -325,9 +326,9 @@ namespace ICSharpCode.AvalonEdit.Editing
 			SetCaretPosition(textArea, newVisualColumn, newOffset);
 		}
 		
-		static void SetCaretPosition(TextArea textArea, int newVisualColumn, int newOffset)
+		static void SetCaretPosition(TextArea textArea, int newVisualColumn, int newOffset, bool atLineEnd = false)
 		{
-			textArea.Caret.Position = new TextViewPosition(textArea.Document.GetLocation(newOffset), newVisualColumn);
+			textArea.Caret.Position = new TextViewPosition(textArea.Document.GetLocation(newOffset), newVisualColumn, atLineEnd);
 			textArea.Caret.DesiredXPos = double.NaN;
 		}
 		#endregion

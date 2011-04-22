@@ -346,8 +346,12 @@ namespace ICSharpCode.AvalonEdit.Editing
 				RevalidateVisualColumn(visualLine);
 			}
 			
-			TextLine textLine = visualLine.GetTextLine(position.VisualColumn);
-			double xPos = textLine.GetDistanceFromCharacterHit(new CharacterHit(position.VisualColumn, 0));
+			TextLine textLine = visualLine.GetTextLine(position.VisualColumn, position.PositionAtLineEnd);
+			double xPos;
+			if( position.VisualColumn == visualLine.GetTextLineVisualStartColumn(textLine)+textLine.Length)
+				xPos = 	textLine.WidthIncludingTrailingWhitespace;
+			else
+				xPos = textLine.GetDistanceFromCharacterHit(new CharacterHit(position.VisualColumn, 0));
 			double lineTop = visualLine.GetTextLineVisualYPosition(textLine, VisualYPosition.TextTop);
 			double lineBottom = visualLine.GetTextLineVisualYPosition(textLine, VisualYPosition.LineBottom);
 			

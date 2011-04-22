@@ -13,6 +13,15 @@ namespace ICSharpCode.AvalonEdit
 	public struct TextViewPosition : IEquatable<TextViewPosition>
 	{
 		int line, column, visualColumn;
+		bool positionAtLineEnd;
+		
+		/// <summary>
+		/// Gets/Sets the line end positioning flag.
+		/// </summary>
+		public bool PositionAtLineEnd{
+			get{ return positionAtLineEnd; }
+			set{ positionAtLineEnd = value; }
+		}
 		
 		/// <summary>
 		/// Gets/Sets the line number.
@@ -42,11 +51,20 @@ namespace ICSharpCode.AvalonEdit
 		/// <summary>
 		/// Creates a new TextViewPosition instance.
 		/// </summary>
-		public TextViewPosition(int line, int column, int visualColumn)
+		public TextViewPosition(int line, int column, int visualColumn, bool atLineEnd)
 		{
 			this.line = line;
 			this.column = column;
 			this.visualColumn = visualColumn;
+			this.positionAtLineEnd = atLineEnd;
+		}
+		
+		/// <summary>
+		/// Creates a new TextViewPosition instance.
+		/// </summary>
+		public TextViewPosition(int line, int column, int visualColumn)
+			: this(line,column,visualColumn,false)
+		{
 		}
 		
 		/// <summary>
@@ -60,11 +78,17 @@ namespace ICSharpCode.AvalonEdit
 		/// <summary>
 		/// Creates a new TextViewPosition instance.
 		/// </summary>
-		public TextViewPosition(TextLocation location, int visualColumn)
+		public TextViewPosition(TextLocation location, int visualColumn, bool atLineEnd)
+			: this(location.Line,location.Column,visualColumn,atLineEnd)
 		{
-			this.line = location.Line;
-			this.column = location.Column;
-			this.visualColumn = visualColumn;
+		}
+		
+		/// <summary>
+		/// Creates a new TextViewPosition instance.
+		/// </summary>
+		public TextViewPosition(TextLocation location, int visualColumn)
+			: this(location,visualColumn,false)
+		{
 		}
 		
 		/// <summary>

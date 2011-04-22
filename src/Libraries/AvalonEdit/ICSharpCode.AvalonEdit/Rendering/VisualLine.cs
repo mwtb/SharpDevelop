@@ -218,16 +218,19 @@ namespace ICSharpCode.AvalonEdit.Rendering
 			return documentLength;
 		}
 		
+		
+		
 		/// <summary>
 		/// Gets the text line containing the specified visual column.
 		/// </summary>
-		public TextLine GetTextLine(int visualColumn)
+		public TextLine GetTextLine(int visualColumn, bool includeTrailingWhiteSpace = false)
 		{
 			ThrowUtil.CheckInRangeInclusive(visualColumn, "visualColumn", 0, VisualLength);
 			if (visualColumn == VisualLength)
 				return TextLines[TextLines.Count - 1];
 			foreach (TextLine line in TextLines) {
-				if (visualColumn < line.Length)
+				if (visualColumn < line.Length ||
+				   (includeTrailingWhiteSpace && visualColumn == line.Length))
 					return line;
 				else
 					visualColumn -= line.Length;
